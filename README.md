@@ -1,1 +1,30 @@
 # cpp-course
+
+## Домашние работы
+* [hello world](seminar/cpp-classroom-2021-sem01-cls01-matrosovm)
+* [массивы, си-строки, указатели](seminar/cpp-classroom-2021-sem01-cls02-matrosovm)
+* [выделение памяти, ссылки](seminar/cpp-classroom-2021-sem01-cls03-matrosovm)
+* [коструктор, деструктор, операторы](seminar/cpp-classroom-2021-sem01-cls04-matrosovm)
+* [cow, касты](seminar/cpp-classroom-2021-sem01-cls05-matrosovm)
+* [полиморфизм](seminar/cpp-classroom-2021-sem01-cls06-matrosovm)
+* [variant, operator new](seminar/cpp-classroom-2021-sem01-cls07-matrosovm)
+* [stl containers](seminar/cpp-classroom-2021-sem01-cls08-matrosovm)
+* [expressions and value categories, unique_ptr](seminar/cpp-classroom-2021-sem01-cls09-matrosovm)
+* [шаблоны](seminar/cpp-classroom-2021-sem01-cls10-matrosovm)
+* [tuple, variadic templates](seminar/cpp-classroom-2021-sem01-cls11-matrosovm)
+* [шаблоны, stl, итераторы, zip](seminar/cpp-classroom-2021-sem02-cls01-matrosovm)
+* [шаблоны, sfinae](seminar/cpp-classroom-2021-sem02-cls02-matrosovm)
+* [constexpr, макросы](seminar/cpp-classroom-2021-sem02-cls03-matrosovm)
+* [тестировка](seminar/cpp-classroom-2021-sem02-cls04-matrosovm)
+* [сериализация, библиотеки](seminar/cpp-classroom-2021-sem02-cls05-matrosovm)
+* [многопоточность](seminar/cpp-classroom-2021-sem02-cls06-matrosovm)
+* [корутины](seminar/cpp-classroom-2021-sem02-cls07-matrosovm)
+* [концепты](seminar/cpp-classroom-2021-sem02-cls08-matrosovm)
+* [ranges](seminar/cpp-classroom-2021-sem02-cls09-matrosovm)
+
+## Лабораторные 
+* [работа с матрицами](homework/2020-ha1-matrices-matrosovm)
+* [длинная арифметика](homework/2020-ha2-bignum-matrosovm)
+* [класс, хранящий любой объект](homework/2020-ha3-whatever-matrosovm)
+* [variant](homework/2020-ha4-variant-matrosovm)
+* [словарь для объектов разных типов](homework/2020-ha5-dict-matrosovm)
