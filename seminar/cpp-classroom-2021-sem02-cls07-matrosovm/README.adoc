@@ -1,0 +1,106 @@
+= Корутины: C++ часть 2, семинар #7
+:source-highlighter: highlightjs
+:revealjs_hash: true
+:icons: font
+:customcss: https://codepen.io/anstreth/pen/WNvVedL.css
+:revealjs_theme: white
+
+
+== Разбор контрольной
+
+Прежде чем решать первую задачу, придётся починить тесты
+
+* так бывает, когда автор тестов хреново умеет в параллельное программирование :)
+
+Проблема 1: в тесте гонка - чтение и запись в `storeroom`. Чиним...
+
+Проблема 2: при данном в задаче API возможна ситуация, когда мы пытаемся джойнить тред из себя самого. Это ситуация дедлока, которую детектирует `join` и кидает исключение
+`resource_deadlock_would_occur` (https://en.cppreference.com/w/cpp/thread/thread/join[recap join на cppreference]).
+
+NB в данном случае такого не происходит, но стоит помнить, что не стоит звать `join` на одном и том же `std::thread` из двух различных потоков без дополнительной синхронизации:
+будет гонка и UB.
+
+
+== Что нужно для этого семинара
+
+* Свежий компилятор (желательно `clang`).
+* `libc++` (https://stackoverflow.com/a/49881934/4696890[ссылка на SO])
+** `sudo apt-get install libc++-10 libc++abi-10-dev`
+** Либо собираем сами 
+*** https://github.com/llvm-mirror/libcxx
+*** https://github.com/llvm-mirror/libcxxabi
+
+* Хедеры для корутин:
+** `<experimental/coroutine>` или `<coroutine>`
+* Ключи компиляции
+** `-stdlib=libc++`
+** `-std=c++2a`
+** `-fcoroutines` (опционально)
+
+
+
+== Задача 0 (1 балл)
+
+Пишем генератор
+
+* Конструируем от callable объекта (который можно вызывать без аргументов: `callable()`)
+* Считаем, что callable можно копировать, а возвращаемый им тип имеет дефолтный конструктор и конструктор копирования.
+* Интерфейс должен удовлетворять тестам
+* За вдохновением можно и нужно https://kirit.com/How%20C%2B%2B%20coroutines%20work/Generating%20Iterators[сюда]
+
+
+== Задача 1 (1 балл)
+
+Напишите класс `co_optional<T>`, который может вести себя подобно монаде `Maybe`.
+
+[source,cpp]
+----
+co_optional<T> combine_stuff() {
+    auto first = co_await make_first(); <1>
+    auto second = co_await make_second(); <2>
+
+    if (first.good() && second.good()) {
+        co_return first.combine(second);
+    }
+
+    co_return co_nullopt; <3>
+}
+----
+
+<1> Если вернется пустой co_optional, то combine_stuff тоже пуст.
+<2> Аналогично.
+<3> Возврат пустого варианта.
+
+=== Интерфейс co_optional
+
+* Вычисление должно быть синхронным (т.е. не ленивым).
+* `operator*`
+* `operator bool`
+* Все, что необходимо для использования `co_optional` как корутины.
+* Рядом должен присутствовать тип `co_nullopt_t`, обозначающий возврат пустого co_optional.
+
+== Задача 2 (1 балл)
+
+Напишите класс `task`, который подразумевает ленивое вычисление чего-либо.
+
+[source,cpp]
+----
+auto int_producer = []() -> task<int> {
+    co_return 1;
+};
+
+auto awaiter = [&]() -> my_task<int> {
+    auto i1 = co_await int_producer();
+    auto i2 = co_await int_producer();
+
+    co_return i1 + i2;
+};
+
+auto my_task = awaiter();
+
+my_task.execute();
+assert(my_task.ready());
+assert(my_task.value() == 2);
+----
+
+См. тесты для интерфейса.

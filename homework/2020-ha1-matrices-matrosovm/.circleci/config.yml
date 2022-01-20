@@ -1,0 +1,8 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: rutsky/cpp-test
+    steps:
+      - checkout # check out the code in the project directory
+      - run: make smoke

@@ -1,0 +1,285 @@
+= Семинар IX
+:icons: font
+:table-caption!:
+:example-caption!:
+:source-highlighter: highlightjs
+:revealjs_hash: true
+:customcss: https://gistcdn.githack.com/fedochet/4ee0f4a2224ecd29a961082a0c63c020/raw/18c107982aba90bb94194c0ac3a8a5ca9bad6782/asciidoc_revealjs_custom_style.css
+:revealjs_theme: blood
+:stylesheet: main.css
+
+
+== Разбор Дорешки VII
+
+== JsonValue
+
+Что тут нехорошо?
+
+[source, cpp]
+----
+
+cls07::Json::JsonValue::ListType &cls07::Json::JsonValue::GetArray() {
+  if (!this->IsArray()) {
+    data_.emplace<ListType>();
+  }
+  return std::get<ListType>(this->data_);
+}
+
+void cls07::Json::JsonValue::Append(const cls07::Json::JsonValue &json) {
+  if (!this->IsArray()) {
+    data_.emplace<ListType>();
+  }
+  std::get<ListType>(this->data_).push_back(json);
+----
+[.step]
+Копипаста, сэр!
+
+
+ifdef::backend-revealjs[=== !]
+Вместо std::holds_alternative используем логику на исключениях
+
+* Очень плохо, логику на исключениях обычно не хочется
+
+ifdef::backend-revealjs[=== !]
+Конструкторы от int/string/bool имело смысл делать не `explicit`
+
+* Позволило бы писать `JsonValue j = 42`, как в примере к задаче
+* Не потребовалось бы писать `operator=` под каждый тип
+
+ifdef::backend-revealjs[=== !]
+
+[source, cpp]
+----
+...
+// геттеры
+bool GetBool();
+int& GetInt();
+std::string& GetString();
+std::list<JsonValue>& GetArray();
+----
+
+image::https://i.ytimg.com/vi/OGAu_DeKckI/hqdefault.jpg[img]
+
+== LeakDetector
+
+* Не используем константы, вообще!
+- код пестрит числом `65536`
+- а также `0xFFFFu`
+- и другими!
+
+ifdef::backend-revealjs[=== !]
+
+* Забываем проверять, что памяти достаточно для запроса
+
+[.small-code]
+[source, cpp]
+----
+
+
+inline char *Allocate(std::size_t previous_size, std::size_t size, char *ptr, std::size_t offset = 0xFFFFu) {
+  ptr += 4 + previous_size;
+  if (ptr >= end) throw std::bad_alloc{};
+  SetUint16(size, ptr);
+  SetUint16(offset, ptr + 2);
+  SetUint16(0u, ptr - previous_size - 2);
+  object_count++;
+  return ptr + 4;
+}
+
+void *operator new(std::size_t n) noexcept(false) {
+  if (n > 65536) throw std::bad_alloc{};
+
+  char *ptr = pool;
+  std::uint16_t offset_to_next = GetUint16(ptr + 2);
+  while (offset_to_next != 0xFFFFu) {
+    // Пытаемся втистнуться между выделенными блоками
+  }
+
+  std::uint16_t size = GetUint16(ptr);
+  return Allocate(size, n, ptr);
+}
+
+----
+
+
+image::https://ibb.co/s2mYfJT[img]
+
+
+== Про кастомные new/delete
+
+Всё немного запутанно, давайте разбираться. Идём на https://en.cppreference.com/w/cpp/memory/new/operator_new[cpp reference]
+
+
+* Переопределение глобальных new/delete
+
+[source, cpp]
+----
+void* operator new(std::size_t count); // (1)
+
+// по дефолту, если её не переопределять, зовёт (1)
+void* operator new[](std::size_t count); // (2)
+
+// аналогично с операторами delete
+----
+
+ссылка: https://godbolt.org/z/7aa485[тык]
+
+ifdef::backend-revealjs[=== !]
+[source, cpp]
+----
+void* operator new(std::size_t size) {
+    std::cout << "void* operator new(std::size_t size)" << std::endl;
+    return malloc(size);
+}
+
+void operator delete(void* mem) noexcept {
+    std::cout << "void operator delete(void* mem)" << std::endl;
+    free(mem);
+}
+
+int main() {
+    int* a = new int[10];
+    delete[] a;
+    return 0;
+}
+----
+
+ifdef::backend-revealjs[=== !]
+
+Placement new/delete
+
+* Обычно имеется в виду прежде всего версия, где передается участок памяти где размещать объект
+* Вообще говоря, placement-версии - это *любые* версии new с более, чем одним аргументом
+
+Тонкий момент: если конструктор кидает исключение, вызывается та версия delete, которая соответствует использованной new
+
+Пример https://godbolt.org/z/1qGqqe[ссылка]
+
+ifdef::backend-revealjs[=== !]
+
+[source, cpp]
+----
+#include <cstdlib>
+#include <iostream>
+
+void* operator new(std::size_t size, std::ostream& out) {
+    out << "Some debug info" << std::endl;
+    return malloc(size);
+}
+
+// void operator delete(void* ptr, std::ostream& out) noexcept {
+//     out << "deleting with ostream" << std::endl;
+//     free(ptr);
+// }
+
+struct S {
+  S() {
+    throw std::runtime_error("I love throwing");
+  }
+};
+
+int main() {
+  try {
+    S* s = new(std::cout) S;
+  } catch (std::runtime_error& e) {}
+  // Здесь у нас уже есть утечка
+}
+----
+
+ifdef::backend-revealjs[=== !]
+
+Начиная с C++14 существует т.н. sized-delete. О чем это? https://godbolt.org/z/xGGcxM[Тык]
+
+[.step]
+* Как мы помним, обычный new принимает на вход `size_t`, а delete нет
+* То есть, аллокатор ответственен за выяснение размера очищаемого объекта
+- Это не всегда эффективно: часто размер выделенной пмяти хранится отдельно от неё => потенциально чтение холодной памяти
+- С С++11 можно писать sized member-delete
+- C С++14 - аналогичные глобальные sized-delete. Суть: если удаляемый тип полный (определён), то вызывается sized-delete, иначе - обычный
+- В clang сейчас по дефолту http://reviews.llvm.org/D8467[выключено], в gcc работает
+
+ifdef::backend-revealjs[=== !]
+
+== expressions and value categories
+Диаграмма категорий значений: link:https://miro.medium.com/max/800/1*G9HLBwBJFho9TNzE0J9__w.png[тык]
+
+Давайте поразбираемся с типами выражений в конкретном сниппете кода (в выражениях нас будут интересовать части "справа"):
+
+ifdef::backend-revealjs[=== !]
+
+```c++
+std::string makeStr();
+
+std::string foo() {
+    std::string s = "bar";
+    s += "baz";
+
+    std::string funcS = makeStr();
+    std::string funcSubStr{std::string_view{funcS}.substr(2)};
+
+    std::string result = std::move(s);
+    result += funcS + funcSubStr;
+
+    return result;
+}
+```
+
+ifdef::backend-revealjs[=== !]
+
+```c++
+std::string makeStr();
+
+std::string foo() {
+    // c-string literals — lvalue
+    std::string s = "bar";
+    s += "baz";
+
+    // return by value => prvalue
+    std::string funcS = makeStr();
+
+    // std::string_view{funcS} — xvalue (т.к. дальше дергается метод)
+    // 2 - prvalue
+    // .substr(...) — prvalue
+    std::string funcSubStr{std::string_view{funcS}.substr(2)};
+
+    // std::move(...) — xvalue
+    std::string result = std::move(s);
+
+    // operator+(s1, s2) — prvalue
+    // operator+=(this, s2) — lvalue
+    result += funcS + funcSubStr;
+    return result;
+}
+```
+
+== Задачки
+
+Весь код должен жить в пространстве имён cls09
+
+=== Пишем свой unique_ptr (1 балл)
+
+До появления rvalue ссылок, в C++ нельзя было написать unique_ptr. Но теперь-то можно :)
+Чтобы обеспечить уникальность владения, unique_ptr должен уметь создаваться только из временных значений.
+Реализуйте класс unique_ptr, руководствуясь тестами.
+
+* шаблонный аргумент - тип хранимого значения
+* нельзя копировать, но можно перемещать
+* метод make_unique с 0..2 параметрами.
+- Должен поддерживаться perfect-forwarding
+
+=== Сортировки! (Максимум 2.5 балла)
+То, чего мы все так ждали. Пишем свою библиотечку сортировок
+
+* Три реализации: bubble sort, merge sort, quick sort
+* За каждую по 0.5 балла
+* Не должно быть лишних копирований (см. тесты)
+* Шаблонные функции по типу входных итераторов
+- для quick sort можно полагаться что итераторы RandomAccess, для bubble/merge - ForwardIt
+- Все сортировки in-place
+
+Для получения ещё 1 балла добавьте каждой сортировке вариант реализации с кастомным компаратором
+
+== Разбор Дорешки VIII
+
+Го ливкодить :)
+https://github.com/cpp-practice/cpp-classroom-2021-sem01-cls08-in-class-solving[Ссылка на репо]

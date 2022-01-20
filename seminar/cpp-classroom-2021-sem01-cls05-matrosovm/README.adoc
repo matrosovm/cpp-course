@@ -1,0 +1,135 @@
+= Семинар V
+:icons: font
+:table-caption!:
+:example-caption!:
+:source-highlighter: highlightjs
+:revealjs_hash: true
+:customcss: https://rawcdn.githack.com/fedochet/asciidoc-revealjs-online-converter/7012d6dd12132363bbec8ba4800272ceb6d0a3e6/asciidoc_revealjs_custom_style.css
+:revealjs_theme: white
+:stylesheet: main.css
+
+== Листы инициализации в классах
+
+[source, cpp]
+----
+class StringView {
+    const char *data_;
+    size_t size_;
+
+public:
+    StringView(const char *d, size_t s)
+        : data_{d}
+        , size_{s}
+    {}
+};
+----
+
+ifdef::backend-revealjs[=== !]
+
+[source, cpp]
+----
+FooClass::FooClass();
+FooClass MakeFoo();
+
+class BarClass {
+    FooClass foo_;
+
+public:
+    BarClass(bool useFunc)
+        // что-нибудь инициализируется?
+    {
+        if (useFunc) {
+            foo_ = MakeFoo();
+        } else { ... }
+    }
+};
+----
+
+== Задачи
+
+
+== LazyString
+Будем разрабатывать строку:
+
+* дешево копируемую (vs std::string)
+* с методами-модификаторами (vs std::string_view)
+
+через парадигму Copy-on-Write:
+
+* данные в куче — и могут быть общими для нескольких объектов
+* при модификации — если не эксклюзивные, то сперва копируются
+
+=== SharedBuffer *[0.5 балла]*
+
+Реализуйте класс `SharedBuffer`
+
+* `SharedBuffer` хранит в себе массив чаров и его размер
+* несколько таких объектов могут ссылаться на один и тот же участок памяти
+* когда последний из них очищается, очищается и эта память
+
+ifdef::backend-revealjs[=== !]
+
+У `SharedBuffer` должны быть следующие методы:
+
+* Конструктор от size_t и конструктор копирования
+* Оператор присваивания
+* `getSize` — возвращает размер данных
+* `getData` — возвращает аллоцированный участок памяти
+* `useCount` — возвращает количество объектов, разделяющих данные (за O(1))
+
+=== LazyString
+
+Реализуйте класс `LazyString` (используя `SharedBuffer`!) c такими методами:
+
+* Дефолтный конструктор
+* Неявный конструктор от `char const*` (т.е. си-строки в данных)
+* Конструктор копирования, оператор присваивания
+
+ifdef::backend-revealjs[=== !]
+
+* `getSize`
+* `cStr`
+* `useCount`
+* `at`, возвращающий символ по индексу (копию)
+** выход за границы — UB
+* `operator==`, внешний `operator+`, `operator+=`
+
+=== CharWrapper *[0.5 балла]*
+Реализуйте `LazyString::operator[]`, возвращающий специальную обертку над символом строки
+
+* частично поддерживающую интерфейс `char&`: элемент можно сравнивать, присваивать, инкрементить
+* при этом если `useCount > 1`:
+** копирование строчки не происходит при read-only инструкциях (`s[2] == 'a'`)
+** а происходит только на изменении данных (`s[2] = 'a'`)
+
+ifdef::backend-revealjs[=== !]
+
+== Read-Write
+
+Напишите функции для чтения/записи типизированных данных из/в массив памяти `char*`
+
+* чтение ранее записанного значения должно возвращать его же
+* возвращаемое значение -- указатель на участок памяти, с которого можно продолжать чтение/запись
+* в сигнатурах опущены const-ы и `&`, добавьте их!
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+----
+char* read(char* data, int& out);
+char* write(char* data, int in);
+
+char* read(char* data, size_t& out);
+char* write(char* data, size_t in);
+----
+
+ifdef::backend-revealjs[=== !]
+
+[source, cpp]
+----
+char* read(char* data, char*& out);
+char* write(char* data, char* in);
+
+char* read(char* input, std::vector<int>& vec);
+char* write(char* input, std::vector<int> vec);
+----

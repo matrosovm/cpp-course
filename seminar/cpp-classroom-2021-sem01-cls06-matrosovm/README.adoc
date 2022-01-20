@@ -1,0 +1,215 @@
+= Семинар VI
+:icons: font
+:table-caption!:
+:example-caption!:
+:source-highlighter: highlightjs
+:revealjs_hash: true
+:customcss: https://rawcdn.githack.com/cpp-practice/cpp-classroom-private-2021/master/semester_01/cls_06/custom.css?token=ABUJQ5KNDNWCLNLHS3A6K4C7UCBDA
+:revealjs_theme: blood
+:stylesheet: main.css
+
+== Ссылочка дня
+
+https://isocpp.org/wiki/faq[isocpp] - годный ФакЮ (и не только) по с++
+
+* e.g https://isocpp.org/wiki/faq/operator-overloading[Про перегрузку операторов]
+
+== Ошибки с прошлой дорёшки
+
+=== Оператор присваивания
+
+- Очень желательно возвращать ссылку на себя (`*this`)
+
+Это позволяет писать код, привычный всем
+[source, cpp]
+----
+// эквивалентно (x = (y = (z = 42)))
+x = y = z = 42;
+----
+
+ifdef::backend-revealjs[=== !]
+
+- Должен корректно работать в случае присваивания самому себе
+
+Это не столь редко, как кажется. Например:
+[source, cpp]
+----
+struct Widget { ... }
+
+Widget widgets[10];
+...
+widgets[i] = widgets[j];  // Присваивание себе если i == j
+
+----
+
+ifdef::backend-revealjs[=== !]
+
+Давайте найдём проблемы в коде
+[.small-code, cpp]
+----
+
+SharedBuffer::SharedBuffer(size_t size) : size(size) {
+    str = new char[size]();
+    count = new size_t(1);
+}
+
+SharedBuffer::~SharedBuffer() {
+    (*count)--;  // счетчик ссылок
+    if ((*count) == 0) {  // если ссылок не осталось, очищаем ресурсы
+        delete str;
+    }
+}
+
+SharedBuffer &SharedBuffer::operator=(const SharedBuffer &sb) {
+    this->~SharedBuffer();
+    size = sb.size;
+    str = sb.str;
+    count = sb.count;
+    (*count)++;
+    return *this;
+}
+----
+ifdef::backend-revealjs[=== !]
+
+* Явный вызов деструктора - так делать не надо НИКОГДА^*^
+- Кроме случая, когда мы хотим вызвать деструктор на объекте, выделенном через placement-new
+* Некорректное удаление `str`
+* Течёт память, выделенная под `count`
+* Нет проверки на присваивание себе (=> вызов деструктора может потереть то, что хотим присвоить)
+- проверка на равенство указателя this
+- copy-and-swap
+
+=== Copy-and-swap VS проверка равенства
+
+[.small-code, cpp]
+----
+SharedBuffer& SharedBuffer::operator=(const SharedBuffer& rhs) {
+  if (this == &rhs) {
+    return *this;
+  }
+  // ... иначе скопировать
+}
+
+void SharedBuffer::swap(SharedBuffer& rhs) { ... }
+
+SharedBuffer& SharedBuffer::operator=(const SharedBuffer& rhs) {
+  SharedBuffer temp(rhs); // создать копию данных rhs
+  swap(tmp);
+  return *this;
+}
+
+// Или так
+SharedBuffer& SharedBuffer::operator=(SharedBuffer rhs) {
+  swap(rhs);
+  return *this;
+}
+----
+
+=== Сериализация вектора
+
+* Использование *любого* специального значения в качестве маркера конца вектора - плохо
+- Лучше просто честно писать в начале размер
+* Если мы передаем данные между архитектурами - полезно подумать об endianness
+- На линуксах можно использовать https://linux.die.net/man/3/htons[hton*]
+* В идеале следует учитывать какое выравнивание требует записываемый/считываемый тип
+- Иначе могут быть проблемы на некоторых архитектурах, например https://blog.quarkslab.com/unaligned-accesses-in-cc-what-why-and-solutions-to-do-it-properly.html[ARM]
+
+=== Работа со строками
+* `strcmp` возвращает 0, *если строки равны* (не наоборот!)
+* Не хотим использовать `std::strcpy`/`std::copy`, `std::memcpy`, предпочитая писать циклы
+
+== Описание задач
+
+В задачах 1-3 будем реализовывать свою библиотеку полиморфных стримов.
+В исследовательской задаче 4 поизучаем как ведет себя выравнивание и размер структуры в зависимости от её состава.
+
+Имена файлов (sic!), в которых следует реализовывать решение,
+определите, исходя из CMakeLists и прилагаемых тестов.
+
+Также поймите, в каком пространстве имён должна быть реализована функциональность.
+
+ifdef::backend-revealjs[=== !]
+
+Есть базовый класс `my_ostream` с виртуальными методами.
+Есть несколько наследников `my_ostream`.
+Стримы умеют выводить в поток три типа: `int`, `double`, `string`.
+
+=== Пример кода
+
+[source,cpp]
+----
+my_ostream_con cout;                    // console output
+my_ostream_file cerr("errors.txt");     // file output
+my_ostream_db dbout(...);               // db output
+
+int main() {
+  std::vector<my_ostream*> stream_ptrs = {&cout, &cerr, &dbout};
+  for (auto stream_ptr : stream_ptrs)
+    (*stream_ptr) << "Hello world on console!" << "\n"
+                  << 1 << 2 << 3 << 4 << "\n"
+                  << 777.777 <<  "\n";
+
+  return 0;
+}
+----
+
+== Задача #1 (1 балл)
+
+Реализовать базовый класс `my_ostream`, одного наследника `my_ostream_con` для вывода данных в консоль.
+
+Должен поддерживаться вывод: `int`, `double`, `std::string`.
+
+
+== Задача #2 (1 балл)
+
+Реализовать наследника `my_ostream_file`, который выводит данные в файл. Попробуйте использовать стримы полиморфно, как на слайде предисловия (положить указатели в вектор и записать что-нибудь одновременно в два стрима).
+
+Работа с файлом должна быть корректной (файл должен быть закрыт после того, как объект `my_ostream_file` уничтожен)
+
+== Задача #3 (1 балл)
+
+Реализовать наследника `my_ostream_combo`, который принимает в конструкторе два стрима и комбинирует их. Т.е. при записи в такой стрим, информация записывается во оба переданных ему в конструктор стрима.
+
+== Задача #4* (2 балла)
+
+Пишем sizeof!
+
+Хотим реализовать функцию `size_t GetSize(const std::string& struct)` возвращающую то же, что вернет `sizeof()` описанной структуры в с++.
+
+* поля типов char, short, int, float, double (1 балл)
+* возможно спецификаторы полей `alignas(n)`, где n - степень двойки (+ 1 балл)
+
+ifdef::backend-revealjs[=== !]
+В данном случае мы делаем следующие допущения
+
+* Решение будет не портабельно, ибо паддинги и выравнивания не строго специфицированы по стандарту. Мы миримся с этим: на стандартных свежих компиляторах gcc/clang ожидаем
+одинаковое поведение.
+* Полагаем в данной задаче, что у нас архитектура x64, размеры char, short, int, long соответственно 1, 2, 4, 8 байт
+
+ifdef::backend-revealjs[=== !]
+
+Пример строки с описанием структуры
+[source,cpp]
+----
+struct A {
+  int x;
+  char y;
+  alignas(16) char z;
+};
+
+----
+
+Парсинг строки рекомендуется делать с помощью https://en.cppreference.com/w/cpp/header/regex[<regex>]
+
+Про выравнивание и паддинг можно почитать https://en.cppreference.com/w/c/language/object[тут]
+
+ifdef::backend-revealjs[=== !]
+Пояснения.
+
+Гарантируется, что
+
+* структура всегда имеет имя A
+* каждое поле определяется на отдельной строке, без лишних пробелов
+* каждое определение начинается с двух пробелов и заканчивается точкой с запятой (см. пример)
+* поля в структуре не инициализируются
+* имеется всегда только одна пара фигурных скобок - на первой и последней строке определения структуры

@@ -1,0 +1,25 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: rutsky/cpp-test@sha256:c8b50d8b0ae4da9c010e9a7cb249d51c8aa44d6ab930e0ab183fc26cade9c73e
+    working_directory: /home
+    steps:
+      - checkout
+      - run:
+          environment:
+            PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-10/bin/
+
+          command: |
+            ls -l
+            set -euo pipefail
+            clang++-10 \
+              -std=c++20 \
+              -Wall -Wextra -Werror -Wextra-semi -Wvla-extension \
+              -O1 -g -fsanitize=address -fno-omit-frame-pointer \
+              -I /home/src/task_2 \
+              -o /tmp/out \
+              /home/src/task_2/read_write.cpp /home/src/task_2/test.cpp
+            /tmp/out
+            echo "Test 2 passed"
+          when: always

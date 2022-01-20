@@ -1,0 +1,287 @@
+= Семинар VII
+:icons: font
+:table-caption!:
+:example-caption!:
+:source-highlighter: highlightjs
+:revealjs_hash: true
+:customcss: https://rawcdn.githack.com/cpp-practice/cpp-classroom-private-2021/master/semester_01/cls_06/custom.css?token=ABUJQ5KNDNWCLNLHS3A6K4C7UCBDA
+:revealjs_theme: blood
+:stylesheet: main.css
+
+== Ошибки с прошлой дорёшки
+
+==== Базовый класс (`my_ostream`):
+
+* Полиморфный класс содержит невиртуальный деструктор
+* Передача std::string в оператор << по значению/не const ссылке
+
+ifdef::backend-revealjs[=== !]
+
+==== Класс для вывода в файл (`my_ostream_file`):
+
+* не `explicit` конструктор от одного аргумента (почему плохо?)
+* Попытки релизовать некорректные операторы копирования/присваивания
+
+ifdef::backend-revealjs[=== !]
+[source, cpp]
+----
+class my_ostream_file : my_ostream {
+  ...
+  std::ofstream fs;
+  std::string filename;
+};
+
+my_ostream_file::my_ostream_file(std::string filename)
+   : filename(filename) {
+  fs.open(filename);
+}
+
+my_ostream_file::my_ostream_file(
+    const cls_06::my_ostream_file &s) {
+  filename = s.filename;
+}
+----
+
+ifdef::backend-revealjs[=== !]
+
+==== Комбинирующий стрим (`my_ostream_combo`):
+
+* Нет очистки ресурсов
+* Некорректные copy/assign
+
+ifdef::backend-revealjs[=== !]
+
+[source, cpp]
+----
+class my_ostream_combo : my_ostream {
+  my_ostream_combo(my_ostream* first, my_ostream* second)
+    : first_(first), second_(second) {}
+  // определения операторов <<
+  ~my_ostream_combo() {
+    delete first_;
+    delete second_;
+  }
+};
+----
+
+[source, cpp]
+----
+int main {
+  my_ostream_file *f = new my_ostream_file("output.txt");
+  my_ostream_con *c = new my_ostream_con{};
+  my_ostream_combo combo1(f, c);
+  {
+    my_ostream_combo combo2 = combo1;
+  }
+  combo1 << 3.14 << "\n"; // Тыдыщ
+}
+----
+
+ifdef::backend-revealjs[=== !]
+
+==== Ковариантность возвращаемого значения
+
+[source, cpp]
+----
+class my_ostream {
+    ....
+    virtual my_ostream& operator<<(int i) = 0;
+};
+
+class my_ostream_file : public my_ostream {
+    ....
+    // корректно менять возвращаемый тип на ковариантный
+    my_ostream_file& operator<<(int i) override {
+        out_ << i;
+        return *this;
+    }
+    std::ofstream out_;
+};
+----
+
+ifdef::backend-revealjs[=== !]
+
+==== Контравариантность параметров метода
+(отсутствует)
+[source, cpp]
+----
+class Car {...};  // Любая машина
+class LightweightCar : public Car {...};  // Легковая машина
+
+class Driver {
+    ...
+    virtual void Drive(LightweightCar& car) {...}
+};
+
+// Может водить как грузовики, так и легковушки
+class TruckDriver : public Driver {
+    ...
+    // не скомпилируется с override
+    void Drive(Car& car) /* override */ {...}
+};
+----
+
+
+ifdef::backend-revealjs[=== !]
+
+Последняя задачка
+
+* Наворотили всякого
+* Пример хорошего и лаконичного решения (Спасибо https://github.com/YaPravaATyNet[YaPravaATyNet])
+
+[source, cpp]
+----
+std::map<std::string, int> sizes = {
+   {"char",   1}, {"short",  2},
+   {"int",    4}, {"long",   8},
+   {"float",  4}, {"double", 8}};
+----
+
+[source, cpp]
+----
+std::regex regex(R"((alignas\((\d+)\))?\s*(\S+)\s*\S+\s*;)");
+std::smatch m;
+std::string str = my_struct;
+size_t size = 0;
+size_t max_size = 1;
+----
+
+
+ifdef::backend-revealjs[=== !]
+
+[source, cpp]
+----
+while(std::regex_search(str, m, regex)) {
+  size_t align = m[2].matched ? stoi(m[2]) : sizes[m[3]];
+  if (max_size < align) {
+    max_size = align;
+  }
+  if (size % align != 0) {
+    size += (align - size % align);
+  }
+  size += sizes[m[3]];
+  str = m.suffix().str();
+}
+----
+
+[source, cpp]
+----
+if (size % max_size != 0) {
+  size += (max_size - size % max_size);
+}
+if (size == 0) {
+  size = 1;
+}
+return size;
+----
+
+== Задачки
+
+* помещаем решения в `namespace cls07`
+
+== JSON value
+
+Будем реализовывать прототип `json` — структуру, значения которой могут быть:
+
+* `null`
+* `int`
+* unicode string bytes (`std::string`)
+* array of `jsons`
+
+=== example
+
+[source, cpp]
+----
+JsonValue j;
+assert(j.IsNull());
+
+// switch to int
+j = 42;
+assert(j.GetInt() + 24 == 66);
+
+// switch to array, implicitly
+j.Append(42);
+j.Append("foo");
+j[0] = "ok";
+
+JsonValue jList{JsonValue::ListType};
+----
+
+=== interface
+* Констукторы:
+** дефолтный (-> `null`)
+** от значений типов bool, int, char (делает строку), std::string
+** копирования
+* Проверки типа хранимого значения: `IsNull`, `IsBool`, ....
+* Геттеры: `GetBool`, `GetArray`, ... + `SetNull`
+** без параметров, _неконстантные_
+* `Append`: добавляет аргумент в значение-список
+* `operator[]` от `size_t` — достает элемент по индексу из значения-листа
+
+=== notes
+* для хранения данных используйте std::variant
+* реализуем пониженную типобезопасность:
+** если метод не соответствует типу хранимого значения (GetSmth, Append, ...)
+** то это значение меняется на лету:
+*** например, на последнем методе в `JsonValue j = "aaa"; j.Append(42);`
+*** сохраненные данные строчки полностью удаляются
+*** новый список инициализируется (и принимает `42`)
+
+== Leak Detector
+
+Напишем простенький leak detector. Его использование в программе (интерфейс):
+
+1. повыделять объекты через new, поудалять через delete
+2. в конце узнать, какая память осталась неочищенной, i.e. вывести адреса, которые:
+** были получены через new
+** не были освобождены через delete
+
+=== что нужно от аллокатора
+
+* собственные глобальные operator new/delete
+* пусть выделяют память на фиксированном статичном участке памяти
+** на глобальном, например, `char pool[65536];`
+** не в динамике (_пока что_, т.к. мы переопределяем new/delete)
+
+=== что нужно от LeakDetector
+
+`struct LeakDetector` — вызывается в момент (завершения), когда нужно обнаружить все утечки. Ему нужны
+
+* дефолтные конструктор, деструктор
+* `void* GetNextLeakedAddress()` — возвращает неосвобожденные адреса
+** если неосвобожденных адресов больше нет, то возвращать `0x0`
+** иначе — следующий (по возрастанию) неосвобожденный адрес
+** гарантируется, что не будет выделения памяти между вызовами `GetNextLeakedAddress`
+*** одного и того же `LeakDetector`
+
+=== послабления и хинты
+
+Можно:
+
+* хранить когда-либо выделенные участки в виде (самописного) связанного списка
+** лучше хранить в "пуле": с каждым участком памяти выделять блок под необходимую мета-информацию
+* искать новый участок памяти за O(n) выделенных ранее блоков
+* переиспользовать ранее выделенный (и затем освобожденный!) участок памяти
+** если его размер не меньше запрашиваемого
+
+== Разбор контрольной
+
+1. https://github.com/cpp-practice/cpp-classroom-2021-sem01-control02-class-solving/settings/access[Добавляем участников]
+2. Создаем ветку в которой будем работать
+3. Каждый участник клонирует `git@github.com:cpp-practice/cpp-classroom-2021-sem01-control02-class-solving.git`
+
+ifdef::backend-revealjs[=== !]
+
+* <Выбираем жертву для задачи 1>
+
+ifdef::backend-revealjs[=== !]
+
+* <Выбираем жертву для задачи 1.5>
+
+ifdef::backend-revealjs[=== !]
+
+* <Выбираем жертву для задачи 2>
+
+ifdef::backend-revealjs[=== !]
+
+* <Выбираем жертву для задачи 3>

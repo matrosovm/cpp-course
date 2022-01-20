@@ -1,0 +1,231 @@
+= Concepts & constrains
+:icons: font
+:lecture: Лекция 2
+:table-caption!:
+:example-caption!:
+:source-highlighter: highlightjs
+:revealjs_hash: true
+:customcss: https://rawcdn.githack.com/fedochet/asciidoc-revealjs-online-converter/7012d6dd12132363bbec8ba4800272ceb6d0a3e6/asciidoc_revealjs_custom_style.css
+:revealjs_theme: white
+:stylesheet: main.css
+
+== Синтаксис:
+
+=== concept
+
+[source,cpp]
+template<class T> concept YourName = BOOL_EXPRESSION;
+
+[source,cpp]
+
+template<class T, EXPLICIT_ARGUMENTS>
+    concept YourName = BOOL_EXPRESSION;
+
+=== requires
+
+[source,cpp]
+----
+template<class T> SOME_DECLARATION
+    requires BOOL_EXPRESSION;
+
+template<class T> requires BOOL_EXPRESSION
+    SOME_DEFINITION {.....}
+----
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+----
+template<class T> ..... requires {
+    VALID_EXPRESSION_1;
+        // компилируемость
+
+    { VALID_EXPRESSION } -> CONCEPT;
+        // соответствие результата концепту
+};
+----
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+template<class T> ..... requires(Some args) {
+    VALID_EXPRESSION(args);
+    { VALID_EXPRESSION(args) } -> CONCEPT;
+};
+
+=== Замена для enable_if
+
+[source,cpp]
+template<class T,
+    std::enable_if_t<
+        std::is_integral_v<T>,
+        int> = 0
+>
+void foo(T t)
+{.....}
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+template<class T>
+void foo(T t) requires std::is_integral_v<T>
+{.....}
+
+[source,cpp]
+template<std::integral T>
+void foo(T t)
+{.....}
+
+=== Где ограничения лучше enable_if
+
+[source,cpp]
+template<class T>
+struct vsemogutor {
+  void foo() requires CanFoo<T> {.....}
+  void foo() requires (!CanFoo<T>) {.....}
+};
+
+== Задача 1.1. Категории печатаемости в поток [0.5 балла]
+
+Вспомним задачу на SFINAE из первого семестра: красивый вывод в std::ostream разнотипных данных.
+
+ifdef::backend-revealjs[=== !]
+
+PrettyPrintable - это:
+
+1. типы, для которых есть вывод в поток (не считая указателей)
+- std::ostream умеет выводить любые умные указатели как адрес - это *исключение* для пункта 1
+2. POD (standard_layout && trivial) (выведем их побайтово)
+- голые указатели также являются POD - это *исключение* для пункта 2
+3. сишная строка - исключение из исключений пунктов 1 и 2 (выводим её как обычно) - поэтому *это частный случай п.1*
+4. указатели на 1-3, включая умные (выведем указуемое значение)
+5. итерируемые коллекции из 1-3 (выведем все элементы в цикле)
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+----
+template<class T> concept Outputtable;
+// включая сишную строку, исключая указатели
+
+template<class T> concept Binary;
+// исключая сишную строку и указатели
+
+template<class T> concept PrettyPrintablePointer;
+
+template<class T> concept PrettyPrintableCollection;
+
+// ИТОГО:
+template<class T> concept PrettyPrintable;
+----
+
+ifdef::backend-revealjs[=== !]
+
+Напишите эти концепты.
+
+Нам могут понадобиться промежуточные метафункции, - если да, то давайте их тоже оформим в виде концептов (имена здесь - наобум)
+[source,cpp]
+----
+template<class T> concept Pointer;
+    // чтобы отсечь ложноположительные срабатывания
+
+template<class T> concept CString;
+    // чтобы не выбросить сишную строку
+
+template<class T> concept PrettyPrintableDereferenced;
+    // разыменованный указатель
+----
+
+ifdef::backend-revealjs[=== !]
+
+Сишные строки - это массивы или указатели на константные и неконстантные char.
+
+Придётся пременить метафункции `std::is_pointer_v`, `std::remove_const_t` и т.п.
+
+== Задача 1.2. Сделаем рекурсию [0.5 балла]
+
+Пусть PrettyPrintable - это:
+
+- п.1-3
+- указатели на любые PrettyPrintable
+- коллекции PrettyPrintable
+
+ifdef::backend-revealjs[=== !]
+
+В отличие от шаблонов классов / функций / переменных, концепты нельзя forward-declare. Соответственно, нельзя просто так взять и взаимно определить два концепта друг через друга:
+
+[source,cpp]
+----
+template<class T> concept Foo = ... Bar ...;
+
+template<class T> concept Bar = ... Foo ...;
+----
+
+ifdef::backend-revealjs[=== !]
+
+Но мы можем определить концепт через шаблон.
+
+[source,cpp]
+----
+template<class T> struct is_bar;  // ::value
+
+template<class T> concept Foo = ... is_bar ...;
+template<class T> concept Bar = ... Foo ...;
+
+template<class T> struct is_bar { ... };
+----
+
+== Задача 1.3. Напишем функции, использующие эти концепты. [0.5 балла]
+
+[source,cpp]
+template<PrettyPrintable T>
+void pretty_print(std::ostream& ost, const T& t);
+
+Формат вывода:
+
+- Outputtable (включая сишную строку) - выводим как есть
+- Binary, но не Outputtable - байты, в шестнадцатиричном виде, через запятую `00,FF,12`
+- Указатель - `nullptr` или `*` и далее указуемое
+- Коллекция - `{ Elem1 Elem2 Elem3 }` (пустая коллекция `{ }`)
+
+ifdef::backend-revealjs[=== !]
+
+Пожалуйста, без халявы `if constexpr` и без магии `enable_if` / `void_t` и т.п.
+
+ifdef::backend-revealjs[=== !]
+
+Если наши концепты пересекаются (а один случай пересечения есть, и он покрыт тестами), то, на выбор,
+
+- напишите уточнённые концепты
+- смешивайте в объявлениях концепты и requires
+
+[source,cpp]
+template<MyCoolType T>
+requires AlsoFeature<T>
+void foo(T t) {.....}
+
+== Задача 1.4. Параметризованные концепты [0.5 балла]
+
+Ранее мы весьма придирчиво подошли к тому, чтобы указатели на неизвестные типы не печатались.
+
+Попробуем управляемо ослабить это требование.
+
+ifdef::backend-revealjs[=== !]
+
+Напишите концепт
+
+[source,cpp]
+template<class T, bool Pretty> concept SomehowPrintable;
+
+такой, что
+
+- все `PrettyPrintable` типы подпадают под `SomehowPrintable<true>`,
+- все, которые хоть как-то могут печататься - подпадают под `SomehowPrintable<false>`
+
+ifdef::backend-revealjs[=== !]
+
+и напишите функцию
+[source,cpp]
+template<???> void somehow_print(std::ostream& ost, const T&);
+
+которая для SomehowPrintable<true> делает то же самое, что pretty_print, а для SomehowPrintable<false> - выводит аргумент в поток вывода.

@@ -1,0 +1,174 @@
+= Семинар 3. продолжение constexpr, макросы
+
+== Вопросы по предыдущему семинару
+
+???
+
+== Немного про constexpr
+
+=== Есть constexpr функции
+[source,cpp]
+----
+constexpr int sum(int x, int y) {
+    return x + y;
+}
+----
+
+=== Есть constexpr переменные
+[source,cpp]
+----
+constexpr int x = 0;
+----
+=== И есть constexpr пользовательские типы
+https://www.modernescpp.com/index.php/constexpr-variables-and-objects
+[source,cpp]
+----
+class MyInt{
+public:
+  constexpr MyInt()= default;
+  constexpr MyInt(int fir, int sec): myVal1(fir), myVal2(sec){}
+  MyInt(int i){
+	myVal1= i-2;
+	myVal2= i+3;
+  }
+  
+  constexpr MyInt(const MyInt& oth)= default;
+  constexpr MyInt(MyInt&& oth)= delete;
+  
+  constexpr int getSum(){ return myVal1+myVal2; }
+  
+  friend std::ostream& operator<< (std::ostream &out, const MyInt& myInt){
+    out << "(" << myInt.myVal1 << "," << myInt.myVal2 << ")";  
+    return out;
+  }
+
+private:
+  int myVal1= 1998;
+  int myVal2= 2003;
+
+};
+static_assert(MyInt(1, 2).getSum() == 3);
+----
+
+== Простые макросы
+Откуда взяты примеры
+
+https://habr.com/ru/post/246971/
+
+https://www.fluentcpp.com/2019/05/14/3-types-of-macros-that-improve-c-code/
+
+=== std::forward<VeryLongTemplateName>(even_longer_variable_name)
+
+Если надоело писать постоянно forward с типом и переменной, можно обратиться к шаблонам
+
+[source,cpp]
+----
+#define FWD(...) ::std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
+----
+
+=== Проверим, что получилось после препроцессинга
+
+----
+clang++ -E a.cpp > tmp_file
+----
+
+=== SAFECALL, Когда хочется безопасно работать с указателями
+
+[source,cpp]
+----
+#define SAFECALL(defaultValue, objectPointer, methodWithArguments)\
+[&](auto&& ptr) -> decltype(auto)\
+{\
+    return ptr ? (ptr->methodWithArguments) : (defaultValue);\
+}\
+(objectPointer)
+
+----
+
+== Найдите 10 отличий^W ошибок
+
+=== Выводим красиво
+
+[source,cpp]
+----
+#define PRETTY_PRINT(expr)                                                     \
+    const std::string str = std::string{__FILE__} + ":"                        \
+        + std::to_string(__LINE__) + " result of " + #expr + " is "            \
+        + std::to_string(expr);                                                \
+    std::cout << str << '\n';
+
+----
+
+=== Проверяем, что инварианты на месте
+Макрос взят из кода яндекс.такси и намеренно испорчен
+[source,cpp]
+----
+#define YTX_INVARIANT(condition, message)                                      \
+    const auto err_str =                                                       \
+        std::string{"Invariant ("} + #condition + ") violation: " + message;   \
+    if (!condition) {                                                          \
+        assert(condition);                                                     \
+        std::cout << err_str << '\n';                                          \
+    }                                                                          \
+
+----
+
+== Домашка
+
+== Задача 1 (1 балл): constexpr-friendly optional
+
+Вы уже наверняка знакомы с `std::optional`. Вам нужно написать свой вариант этого класса.
+
+ifdef::backend-revealjs[=== !]
+
+Пример использования.
+
+[source,cpp]
+----
+constexpr optional<int> opt {20};
+constexpr auto result = opt.value_or(10); // 20
+static_assert(result == 20);
+----
+
+== Задача 2: фреймворк для тестирования
+
+Фреймворк для тестирования как google test, только хуже. Искать вдохновение можно и нужно в google test (или в тестах, если google test не заводится)
+
+=== [1.5 балла] Базовая часть:
+
+[source,cpp]
+----
+O_TEST(CaseName, test_name) {
+    O_ASSERT_EQ(1, 1);
+}
+
+int main() {
+    run_all_tests();
+}
+----
+
+Поведение должно быть похоже на поведение фреймворка google test. Чем больше похоже поведение на google test, тем лучше. Должны поддерживаться кейсы (наборы тестов). Тесты должны группироваться по кейсам. Должны быть доступны макросы O_ASSERT_EQ и O_EXPECT_EQ. В случае ошибки они должны выводить то же, или примерно то же самое, что и google test.
+
+=== [1 балла] Ещё проверки
+
+Поддержать O_ASSERT_FLOAT_EQ, O_ASSERT_THROW, O_ASSERT_TRUE, и аналоги с отрицанием и аналоги с EXPECT
+
+=== [0.5 балла] И добавить фикстуры
+
+Фикстуры позволяют переиспользовать код в тестах при инициализации, завершении теста. 
+В тесте есть пример фикстуры, в которую выделен код запуска и останова какого-нибудь абстрактного web сервиса
+с базой.
+
+== Попробуем написать что-нибудь интереснее
+=== Удобный логгер
+
+[source,cpp]
+----
+LOG_INFO() << "my awesome log";
+LOG_DEBUG() << "my awesome log";
+LOG(dynamic_level) << "dynamic log"
+----
+
+
+
+

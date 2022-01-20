@@ -1,0 +1,5 @@
+/smoke_test
+.idea
+cmake-*
+CMakeLists.txt
+test.cpp

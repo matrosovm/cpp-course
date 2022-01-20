@@ -1,0 +1,3 @@
+namespace cls_06 {
+
+}

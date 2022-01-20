@@ -1,0 +1,7 @@
+syntax = "proto2";
+
+package control_02;
+
+message PhoneBookProto {
+    map<string, string> phone_by_name = 1;
+}

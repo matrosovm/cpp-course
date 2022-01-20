@@ -1,0 +1,251 @@
+= Семинар VIII
+:icons: font
+:table-caption!:
+:example-caption!:
+:source-highlighter: highlightjs
+:revealjs_hash: true
+:customcss: https://rawcdn.githack.com/cpp-practice/cpp-classroom-private-2021/master/semester_01/cls_06/custom.css?token=ABUJQ5KNDNWCLNLHS3A6K4C7UCBDA
+:revealjs_theme: blood
+:stylesheet: main.css
+
+== Цели занятия
+
+* Обсудить шаблоны, stl-контейнеры, итераторы
+* Научиться писать шаблонные функции
+* Увидеть работу вывода шаблонных типов для шаблонных функций
+* Научиться писать шаблонные классы и использовать их
+
+== STL
+
+* Не STandard library, а Standard Template Library
+* Три столпа
+[.step]
+- контейнеры - где хранить данные
+- алгоритмы - как обрабатывать данные
+- интераторы - как осуществлять обход данных в контейнере
+
+== https://en.cppreference.com/w/cpp/container[STL containers]
+
+Контейнеры - шаблонные классы (по типу хранимого значения, аллокатору, ...)
+
+* Можно разбить на последовательные
+
+- `std::vector`
+- `std::list`
+- `std::deque`
+- ...
+
+ifdef::backend-revealjs[=== !]
+
+* и ассоциативные
+- `std::map`
+- `std::set`
+- `std::unordered_map`
+- ...
+
+ifdef::backend-revealjs[=== !]
+
+Каждый определён в своем хедере в пространстве имён std
+
+[source, cpp]
+----
+#include <string>
+#include <map>
+
+int main() {
+  std::map<std::string, size_t> person_age;
+  person_age["Vasya"] = 19;
+  ...
+}
+----
+
+ifdef::backend-revealjs[=== !]
+
+* Имеют ряд одноименных методов, имеются (почти?) во всех контейнерах
+- `size`
+- `empty`
+* Ряд специфичных для некоторых контейнеров
+- `push_back` в векторе/деке/списке
+- `at` в мапе/векторе/деке
+- `count` в мапе/сете
+
+ifdef::backend-revealjs[=== !]
+
+* Есть контейнеры-адаптеры над последовательными контейнерами
+* Адаптируют интерфейс контейнера под структуру данных
+- std::stack
+- std::queue
+- std::priority_queue
+
+ifdef::backend-revealjs[=== !]
+
+== Контейнеры и сложность
+image::https://miro.medium.com/max/700/1*2vTAptn2X3HFr7iV_rkwPA.png[img]
+Таблица с http://john-ahlgren.blogspot.com/2013/10/stl-container-performance.html[STL Container Performance]
+
+== Итераторы
+
+Допустим мы хотим написать функцию, ищущую максимум в массиве, и хотим искать его
+на произвольном участке в массиве.
+
+[.step]
+* Q: Постоянно передавать сам массив не хочется, что делать? Что объединяет в себе массив и индекс в нём?
+* A: Указатель! Его дешево копировать, это один параметр, и его можно разыменовать.
+
+ifdef::backend-revealjs[=== !]
+
+Указатели естественны для работы с массивами.
+
+Контейнеры могут быть более хитро устроены, но хотелось бы сохранить "интерфейс" работы с указателями.
+
+[.step]
+* Выход: итераторы!
+
+ifdef::backend-revealjs[=== !]
+
+Контейнеры вроде `vector` определяют внутренние типы-итераторы.
+
+Эти типы имитируют указатели.
+
+ifdef::backend-revealjs[=== !]
+
+Работа с итератором вектора.
+
+[source,cpp]
+----
+// typedef vector<int>::iterator vec_iterator;
+using vec_iterator = vector<int>::iterator;
+
+vector<int> vec {1, 2, 3};
+vec_iterator it = vec.begin();
+
+*it; // => 1
+++it;
+*it; // => 2
+
+*it = 4; // теперь vec = {1, 4, 3};
+
+it += 2; // it указывает на позицию после последнего элемента
+it == vec.end(); // => true, end() указывает туда же
+----
+
+== Template args "requirements"
+
+Шаблонный код как правило накладывает неявные ограничения на аргументы:
+
+[source, cpp]
+----
+template <typename T>   // implicit T requirements:
+void foo(T v) {         // copy constructible
+    ++v;                // operator++
+    int i = v;          // operator int
+    std::min(v, T{});   // comparable, default constructible
+    ...
+}
+----
+
+* что и как можно убрать из требований к T в коде выше?
+* => лучше минимизируйте требования в шаблонном коде
+
+=== member helpers
+
+Используя свойства типа, можно писать _более определенный_ шаблонный код:
+
+[source, cpp]
+----
+template <typename Сont>            // implicit Сont requirements:
+void foo(const Сont& c) {
+    Cont::value_type v = c.front(); // getting type of elements
+    Cont::iterator it = c.begin();  // getting type of iterators
+
+    // same types + same values
+    std::is_same_v<Cont::value_type, Cont::iterator::value_type>;
+    assert(c == *it);
+
+    std::advance(it, 5);
+}
+----
+
+== heap algos
+
+Алгоритмы, манипулирующие _heap_ на заданном интервале
+
+[source, cpp]
+----
+std::vector<int> v = {3, 2, 4, 1, 5, 9};
+
+std::make_heap(v.begin(), v.end());  // -> {9, 5, 4, 1, 2, 3}
+std::pop_heap(v.begin(), v.end());   // -> {5, 4, 1, 2, 3, 9}
+std::sort_heap(v.begin(), v.end());  // -> ?
+----
+
+=== make_heap requirements
+[source, cpp]
+----
+template< class RandomIt, class Compare >
+constexpr void make_heap( RandomIt first, RandomIt last);
+----
+
+* `RandomIt`: satisfies https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator[RandomAccessIterator]
+** _зачем Random?_
+* element after dereference: `MoveAssignable` and `MoveConstructible`
+* _есть версия с доп аргументом_ `Compare`
+
+ifdef::backend-revealjs[=== !]
+
+Какие STL контейнеры подойдут для make_heap?
+
+== Задачи
+
+== Compile-time recursion [0.5 балла]
+
+Реализуйте шаблонную структуру (от параметра size_t), хранящую в const static member (`value`) число Фибоначчи соответствующего индекса
+
+== Functions
+
+Реализовать 4 шаблонные функции (аналоги из стандартной библиотеки)
+
+* Постарайтесь минимизировать требования к шаблонным типам
+* Во всех заданиях диапазон вида `[begin, end)`
+* За каждую функцию дается 0.25 балла
+
+ifdef::backend-revealjs[=== !]
+
+* `fill` - принимает два указателя на начало и конец диапазона и значение, которым заполнит этот диапазон
+* `generate` - принимает два указателя на начало и конец диапазона и функцию-генератор значения
+** каждый элемент из диапазона инициализирует отдельно сгенеренным значением
+
+ifdef::backend-revealjs[=== !]
+
+* `copy` - принимает три указателя: два на начало и конец диапазона источника (source) и один на начало диапазона назначения (destination)
+* `for_each` - принимает два указателя на начало и конец диапазона и функтор. Выполняет функтор над каждым элементом
+
+== Queue [2 балла]
+
+Реализовать шаблонный односвязный список и реализовать поверх него FIFO-очередь
+
+ifdef::backend-revealjs[=== !]
+
+Необходимый интерфейс очереди:
+
+* Конструктор, конструктор копирования, оператор=, деструктор
+* Вставка в конец очереди push(const T&)
+* Удаление первого элемента void pop()
+* Доступ к первому элементу `T& front, const T& front`
+* Размер очереди `size_t size()`
+
+== Priority Queue
+
+* Реализовать шаблонную очередь с приоритетами
+** Для поддержания порядка внутри очереди используйте кучу (алгоритм)
+* Интерфейс такой же, как в предыдущей задаче, за исключением одной детали у front -- смотрите тесты
+
+ifdef::backend-revealjs[=== !]
+
+* При реализации не нужно использовать очередь из предыдущей задачи
+* Если не хотите реализовывать алгоритм - можете использовать функции STL для работы с двоичной кучей
+** Это функции `*_heap` в хедере `<algorithm>`
+
+=== Custom Comparator [*][0.5 балла]
+
+Если сделали и заскучали - добавьте к классу шаблонный параметр - компаратор со значением по-умолчанию (см. `std::priority_queue`)

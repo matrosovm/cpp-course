@@ -1,0 +1,76 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: rutsky/cpp-test@sha256:c8b50d8b0ae4da9c010e9a7cb249d51c8aa44d6ab930e0ab183fc26cade9c73e
+    working_directory: /home
+    steps:
+      - checkout
+      - run:
+          environment:
+            PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-10/bin/
+
+          command: |
+            ls -l
+            set -euo pipefail
+            clang++-10 \
+              -std=c++20 \
+              -Wall -Wextra -Werror -Wextra-semi -Wvla-extension \
+              -O1 -g -fsanitize=address -fno-omit-frame-pointer \
+              -I /home/src \
+              -o /tmp/out \
+              /home/src/tests/task_1_test.cpp /home/src/my_ostream.cpp /home/src/my_ostream_con.cpp
+            /tmp/out
+            echo "Test 1 passed"
+          when: always
+      - run:
+          environment:
+            PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-10/bin/
+
+          command: |
+            ls -l
+            set -euo pipefail
+            clang++-10 \
+              -std=c++20 \
+              -Wall -Wextra -Werror -Wextra-semi -Wvla-extension \
+              -O1 -g -fsanitize=address -fno-omit-frame-pointer \
+              -I /home/src \
+              -o /tmp/out \
+              /home/src/tests/task_2_test.cpp /home/src/my_ostream.cpp /home/src/my_ostream_file.cpp
+            /tmp/out
+            echo "Test 2 passed"
+          when: always
+      - run:
+          environment:
+            PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-10/bin/
+
+          command: |
+            ls -l
+            set -euo pipefail
+            clang++-10 \
+              -std=c++20 \
+              -Wall -Wextra -Werror -Wextra-semi -Wvla-extension \
+              -O1 -g -fsanitize=address -fno-omit-frame-pointer \
+              -I /home/src \
+              -o /tmp/out \
+              /home/src/tests/task_3_test.cpp /home/src/my_ostream.cpp /home/src/my_ostream_con.cpp /home/src/my_ostream_file.cpp /home/src/my_ostream_combo.cpp
+            /tmp/out
+            echo "Test 3 passed"
+          when: always
+      - run:
+          environment:
+            PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-10/bin/
+
+          command: |
+            ls -l
+            set -euo pipefail
+            clang++-10 \
+              -std=c++20 \
+              -Wall -Wextra -Werror -Wextra-semi -Wvla-extension \
+              -O1 -g -fsanitize=address -fno-omit-frame-pointer \
+              -I /home/src \
+              -o /tmp/out \
+              /home/src/tests/task_4_test.cpp /home/src/get_size.cpp
+            /tmp/out
+            echo "Test 4 passed"
+          when: always

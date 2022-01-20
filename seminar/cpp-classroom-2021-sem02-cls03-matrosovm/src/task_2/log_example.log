@@ -1,0 +1,56 @@
+[==========] Running 9 tests from 4 test cases.
+[----------] 2 test(s) from Lvl1
+[ RUN      ] Lvl1.success
+[      OK  ] Lvl1.success(0 ms)
+[ RUN      ] Lvl1.failure
+/home/nikitaevg/documents/prog/testing/tests/main.cpp:47: Failure
+	Expected f(5, 10)
+Which is 15
+	To be equal to 16
+/home/nikitaevg/documents/prog/testing/tests/main.cpp:48: Failure
+	Expected state_changing_function()
+Which is 0
+	To be equal to 1
+[  FAILED  ] Lvl1.failure(0 ms)
+[----------] 2 test(s) from Lvl1 (0 ms total)
+[----------] 1 test(s) from Lvl1_1
+[ RUN      ] Lvl1_1.new_case
+[      OK  ] Lvl1_1.new_case(0 ms)
+[----------] 1 test(s) from Lvl1_1 (0 ms total)
+[----------] 4 test(s) from Lvl2
+[ RUN      ] Lvl2.success
+[      OK  ] Lvl2.success(0 ms)
+[ RUN      ] Lvl2.failure1
+/home/nikitaevg/documents/prog/testing/tests/main.cpp:77: Failure
+Expected: [] { ; }() throws an exception of type std::exception.
+  Actual: it throws nothing.
+[  FAILED  ] Lvl2.failure1(0 ms)
+[ RUN      ] Lvl2.failure2
+/home/nikitaevg/documents/prog/testing/tests/main.cpp:81: Failure
+Expected: [] { throw 4; }() throws an exception of type std::exception.
+  Actual: it throws a different type.
+[  FAILED  ] Lvl2.failure2(0 ms)
+[ RUN      ] Lvl2.failure3
+/home/nikitaevg/documents/prog/testing/tests/main.cpp:85: Failure
+Expected: [] { throw 4; }() doesn't throw an exception.
+  Actual: it throws.
+[  FAILED  ] Lvl2.failure3(0 ms)
+[----------] 4 test(s) from Lvl2 (0 ms total)
+[----------] 2 test(s) from ServiceFixture
+[ RUN      ] ServiceFixture.ping
+[      OK  ] ServiceFixture.ping(0 ms)
+[ RUN      ] ServiceFixture.putEntity
+/home/nikitaevg/documents/prog/testing/tests/main.cpp:144: Failure
+	Expected service_.putEntity("Jon Snow")
+Which is 403
+	To be equal to 200
+[  FAILED  ] ServiceFixture.putEntity(0 ms)
+[----------] 2 test(s) from ServiceFixture (0 ms total)
+[==========] Running 9 tests from 4 test cases ran. ( 0 ms total)
+[  PASSED  ] 4 test(s).
+[  FAILED  ] 5 test(s).
+[  FAILED  ] Lvl1.failure
+[  FAILED  ] Lvl2.failure1
+[  FAILED  ] Lvl2.failure2
+[  FAILED  ] Lvl2.failure3
+[  FAILED  ] ServiceFixture.putEntity

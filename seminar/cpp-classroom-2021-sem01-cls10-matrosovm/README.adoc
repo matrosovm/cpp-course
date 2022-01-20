@@ -1,0 +1,104 @@
+= Семинар X
+:icons: font
+:table-caption!:
+:example-caption!:
+:source-highlighter: highlightjs
+:revealjs_hash: true
+:customcss: https://gistcdn.githack.com/fedochet/4ee0f4a2224ecd29a961082a0c63c020/raw/18c107982aba90bb94194c0ac3a8a5ca9bad6782/asciidoc_revealjs_custom_style.css
+:revealjs_theme: blood
+:stylesheet: main.css
+
+
+== Разбор Дорешки IX
+
+=== unique_ptr
+В целом написали неплохо
+
+* аккуратней с конструкторами от одного аргумента: обычно их стоит делать explicit!
+
+=== Сортировки
+Not great, not terrible
+
+[.step]
+* любая арифметика на итераторах с привлечением целых чисел => random access!
+- ForwardIterator можно смещать только через operator++
+- BidirectionalIterator через operator++/operator--
+* есть std::next/std::advance для смещения на нужное число элементов любых итераторов
+* Продолжаем использовать постинкремент вместо преинкремента для итераторов
+
+== Задачки
+
+Весь код должен жить в пространстве имён cls10
+
+== Пишем логгер (1 балл)
+Хотим написать фабрику логирующих функций.
+
+Логирующая функция, созданная фабрикой, должна вызывать переданную в фабрику
+функцию от одного аргумента (и возврщать то, что она возвращает!), при этом выводя перед её вызовом в stdout
+строку log_before, а после завершения вызова log_after.
+
+[source, cpp]
+----
+template<class UnaryFunction>
+decltype(auto) logging_wrapper(UnaryFunction&& f, const std::string& log_before,
+  const std::string& log_after);
+----
+
+Подробности использования смотрите в тестах.
+
+== deque (2 балла)
+
+Писали вектор, напишем deque! :)
+
+Хотим написать шаблонный deque, строго безопасный относительно исключений.
+Методы
+
+* size
+* empty
+* front
+* back
+* push_back  (&&/& версии)
+* push_front (&&/& версии)
+* pop_back
+* pop_front
+* clear
+* operator[]
+* копирование, присваивание (&&/& версии)
+
+Сложность добавления в начало/конец, доступа по индексу - O(1).
+Нельзя пользоваться никакими контейнерами stl внутри реализации.
+
+== Events (1 балл)
+
+Напишите класс `Event<ReturnType(ArgType)>`:
+
+* класс шаблонный — содержит два параметра: ReturnType, ArgType
+* на него можно подписывать callable через `Event::subscribe`
+** с сигнатурой `ReturnType(ArgType)`
+* все подписанные коллбэки можно просигналить через `Event::fire`
+** в этот момент их нужно поочередно вызвать с переданным аргументом
+** аргумент нужно идеально передать
+
+=== example
+
+```c++
+Event ev;
+ev.subscribe(std::bind(foobar, 1, 2, 3, _1));
+ev.subscribe([](void *arg) { std::cout << arg; });
+
+// вызываются foobar(1, 2, 3, "hello!"), lambda("hello!")
+ev.fire(const_cast<char*>(“hello!”));
+```
+
+== Доделка контрольной maybe (1 балл)
+
+Доделываем контрольную до варианта, в котором будут проходить все тесты
+
+* namespace оставим тот же: `control_03`
+* сейчас будет немного лайв-кодинга
+* ваши завершенные решения добавят _сколько-то_ баллов в зачет по контрольным
+
+=== если тесты уже ок
+
+* сделайте у maybe форму конструктора с первым аргументом `control_03::inplace`
+* см. https://en.cppreference.com/w/cpp/utility/in_place[std::in_place]

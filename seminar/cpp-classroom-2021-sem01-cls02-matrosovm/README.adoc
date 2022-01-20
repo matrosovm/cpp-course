@@ -1,0 +1,289 @@
+= Семинар II
+:source-highlighter: highlightjs
+:revealjs_hash: true
+:icons: font
+:customcss: https://codepen.io/anstreth/pen/WNvVedL.css
+:revealjs_theme: white
+
+== оценки дорешек
+* баллы за дорешку #1 -- большие:
+** выдали штрафы как на контрольной
+** а условия сдачи проще
+* мы их побалансим:
+** x1.5 — если решение не надо править
+** снижения больше
+** важно прислать исправления
+
+== Типичные ошибки прошлого семинара
+
+=== Неконсистентные типы
+
+[source,cpp]
+----
+int64_t id(int64_t n) {
+    int tmp = n;
+    return n;
+}
+----
+В чем проблема?
+
+[%step]
+* Бонус: ловится на компиляции в CI-тестах
+
+=== Переполнение
+
+[source,cpp]
+----
+void fizzbuzz(uint64_t n) {
+    for (uint64_t i = 1; i <= n; ++i) {
+        /* do job */
+    }
+}
+----
+
+Где проблемы?
+
+[%step]
+* Как починить?
+
+ifdef::backend-revealjs[=== !]
+
+Вариант исправления:
+
+[source,cpp]
+----
+void fizzbuzz(uint64_t n) {
+    for (uint64_t i = 0; i < n; ++i) {
+        uint64_t j = i + 1;
+        /* do job */
+    }
+}
+----
+
+=== Лишние заголовочные файлы и using
+
+.header.hpp
+[source,cpp]
+----
+#include <iostream>
+#include <cstdint>
+#include <string>
+
+using namespace std;
+
+void foo(uint64_t times, string str);
+----
+
+Что здесь лишнее?
+
+ifdef::backend-revealjs[=== !]
+
+Оставим только необходимое:
+
+.header.hpp
+[source,cpp]
+----
+#include <cstdint>
+#include <string>
+
+void foo(uint64_t times, std::string str);
+----
+
+Что еще?
+
+ifdef::backend-revealjs[=== !]
+
+.header.hpp
+[source,cpp]
+----
+#pragma once // или написать include guard
+
+#include <cstdint>
+#include <string>
+
+void foo(uint64_t times, std::string str);
+----
+
+== Сегодня на занятии
+
+* статические массивы
+* си-строки
+* указатели
+* преобразования типов
+
+== Статические массивы
+При передаче в функцию будем явно передавать размер
+
+[source,cpp]
+----
+void do_something(int *a, size_t s);
+
+const size_t N = 10;
+int array[N] = { 1, -3 };
+
+do_something(array, N);
+----
+
+=== си-строки
+
+[source,cpp]
+----
+const char sa[] = "hi";
+const char* sp = "hi";
+----
+
+[%step]
+* Где можно опустить `const`?
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+----
+// ok, local array
+char sa[] = "hi";
+char sa2[] = {'h', 'i', '\0'};
+// можно менять
+
+// warning: ISO C++ forbids converting
+// a string constant to 'char*'
+char* sp = "hi";
+// Изменение sp[0] => UB
+----
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+----
+const char* s = "Hello\0, World";
+----
+
+[%step]
+* `strlen(s)`?
+* `sizeof(s)`?
+
+ifdef::backend-revealjs[=== !]
+
+Полезные функции:
+
+* из `<cstring>`
+* `strlen` -- получить длину си-строки
+* `strcmp` -- сравнить пару (лексикографически)
+* `strchr` -- поискать символ
+* `strncat` -- склеить строки
+
+=== указатели
+
+пригодятся, см. лекцию
+
+=== про преобразования простых типов (*)
+
+[source,cpp]
+----
+int32_t i32 = 4; // битовое представление: 0...0000000100
+float f = 4;     // уфф, ну там знак + порядок + мантисса...
+
+f = i32;         // ok, компилятор преобразует
+----
+
+=== static_cast
+* инструкция компилятору делать безопасное преобразование типов
+** есть набор условий, когда оно применимо
+** в т.ч. определено приведение простых типов (int32_t -> int64_t, int32_t -> float и др.)
+*** "безопасность" ≈ "единичка остается единичной, пятерка пятеркой и т.д."
+* иногда выполняется неявно (implicit)
+
+=== reinterpret_cast
+* небезопасное преобразование типов
+* частый кейс — инстукция компилятору "воспринимай _то же_ значение как другой тип"
+
+[source,cpp]
+----
+int32_t i32 = 4;
+float f = *(reinterpret_cast<float*>(&i32));
+----
+
+[%step]
+* какие exponent + fraction у `f`?
+
+== задачи
+
+=== #1 string_utils
+
+* нельзя использовать `<cstring>` (!)
+* Реализуйте `strcmp` — _как в_ `<cstring>` [0.5 балла]
+
+[source,cpp]
+----
+int strcmp(const char* s1, const char* s2);
+----
+
+ifdef::backend-revealjs[=== !]
+
+* Реализуйте `findNearestSame` [0.5 балла]
+
+[source,cpp]
+----
+ptrdiff_t findNearestSame(const char* s, const char* c);
+----
+
+** `s` — си-строка
+** `c` — указатель на символ внутри нее (не `\0`)
+** найдите сдвиг от `c` до ближайшего такого же символа в строке
+*** если нет такого же — верните `0`
+*** если ближайших несколько — верните положительный сдвиг
+
+
+=== #2 array_utils
+
+_Инты -- это `int`, для описания количества используйте `size_t`_
+
+_Под массивом подразумевается прием по указателю_
+
+ifdef::backend-revealjs[=== !]
+
+Реализуйте (каждая по [0.5 балла]):
+
+* `sum` - принимает массив интов и количество элементов в массиве; возвращает их сумму
+* `countNumbers` - принимает массив интов в диапазоне [0, 9] и количество элементов в массиве; возвращает
+количество уникальных чисел в массиве
+* `popZeros` — принимает массив указателей на инты, и перемещает значения-нули в конец
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+----
+using const_int_pointer_t = const int*;
+
+void popZeros(const_int_pointer_t *a, size_t size);
+
+int i = 2, j = 0, k = -2;
+----
+
+* на вход: `{&i, nullptr, &j, &k}`
+* в результате: `{&i, nullptr, &k, &j}`
+
+=== #3 ladder_combinations
+
+* реализовать `ladderCombinations` [0.5 балла]:
+** функция использует статический массив, вычисляет для числа `N` (`0 \<= N < 21`),
+сколько существует способов забраться на лестницу из N ступеней,
+если можно шагать на каждую по очереди или через одну.
+** возвращает ответ для переданного параметра `n` (номер ступени)
+
+ifdef::backend-revealjs[=== !]
+* lazy `ladderCombinations` [*][0.5 балла]:
+** [*]: _подразумевает, что на лекции было про linkage + storage duration_
+** подсчитать массив только один раз (на несколько запросов функции `ladder_combinations`)
+** массив не должен быть доступен в виде глобальной переменной
+
+=== #4 extract_exponent [*]
+
+* Реализовать `extractExponent` [1 балл]:
+** функция возвращает порядковые биты (== биты экспоненты) переданного float
+
+[source,cpp]
+----
+int32_t extractExponent(float f);
+----
+
+

@@ -1,0 +1,323 @@
+= Семинар III
+:source-highlighter: highlightjs
+:revealjs_hash: true
+:icons: font
+:customcss: https://codepen.io/anstreth/pen/WNvVedL.css
+:revealjs_theme: white
+
+== Ошибки с прошлого семинара
+
+* Забываем ставить `#pragma once`
+* popZeros — нужно делать inplace
+
+== Что можно улучшить?
+[source,cpp]
+----
+ptrdiff_t findNearestSame(const char* s, const char* c) {
+  int position = 0;
+  int sch = 0;
+  const char* s1 = s;
+
+  while (s1 != c){
+    position++;
+    s1++;
+  }
+  ...
+----
+
+== Что тут лишнее?
+[source,cpp]
+----
+...
+size_t first_zero_item = s - 1;
+while (first_zero_item >= 0 && a[first_zero_item] != nullptr && *a[first_zero_item] == 0) {
+  if (first_zero_item == 0){
+    break;
+  }
+...
+----
+
+== Немного про extractExponent
+Если делать по феншую, следует учесть, что
+
+- float может быть не 4 байтным (видимо, стоит сообщать об ошибке в виде асерта?)
+- на системе может быть различный https://en.cppreference.com/w/cpp/types/endian[endianness]
+- https://en.cppreference.com/w/cpp/language/object#Alignment[требование к выравниванию] типа, используемого при `reinterpret_cast` может отличаться от выравнивания `float`
+
+== Сегодня на занятии
+* ссылки
+* аргументы функции
+* динамическая память
+* структуры
+* inline trick
+
+== Ссылки
+
+[source,cpp]
+----
+int i = 3;
+int &r = i;
+----
+
+[%step]
+* `sizeof(r)`?
+* -> возвратит размер типа за ссылкой == `sizeof(int)`
+* в то же время "передача по ссылке" — "легковесная"
+
+ifdef::backend-revealjs[=== !]
+
+В чем отличие ссылки от указателя?
+
+[%step]
+* нет nullptr (и аналогов)
+* ссылку нельзя переназначить
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+----
+int i = 3;
+int &r = i;
+int *p = &i;
+----
+
+[%step]
+* `i` и `r` обозначают один и тот же участок памяти
+* `p` — не факт, что в течение всего выполнения указывает на `i`
+* ссылка _может быть_ реализована через указатель (в конкретном случае)
+
+=== dangling reference
+
+[source,cpp]
+----
+int& foo() {
+    int n = 10;
+    return n;
+}
+
+int& i = foo();
+----
+* в чем проблема?
+* как починить?
+
+== Передача аргументов в функцию
+* На лекции: по значению, по ссылке, по указателю
+* Зачем передавать не по значению?
+
+ifdef::backend-revealjs[=== !]
+
+* изменить аргумент
+
+[source,cpp]
+----
+void changeArg(int& a) { a += 24; };
+
+int i = 42;
+
+changeArg(i);
+assert(i == 66);
+----
+
+ifdef::backend-revealjs[=== !]
+* избежать копирования == передать меньше данных
+
+[source,cpp]
+----
+// хранит длину + данные строки + ...
+using string_t = std::string;
+
+// передаем по адресу => 4/8 байт
+void argPassedByRef(const string_t& longString);
+----
+
+=== Примеры
+Как передаются аргументы?
+
+[source,cpp]
+----
+void foo(int);
+
+int i = 42;
+
+foo(i);  // (1)
+foo(24); // (2)
+----
+
+[.fragment]
+(1): по значению
+
+[.fragment]
+(2): по значению
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+----
+void foo(int&);
+
+int i = 42;
+
+foo(i);  // (1)
+foo(24); // (2)
+----
+
+[.fragment]
+(1): по значению
+
+[.fragment]
+(2): не скомпилируется — _почему?_
+
+ifdef::backend-revealjs[=== !]
+
+[source,cpp]
+----
+void foo(int*);
+
+int i = 42;
+int *p = &i;
+
+foo(&i);        // (1)
+foo(p);         // (2)
+foo(new int{}); // (3)
+----
+
+[.fragment]
+(1): копируется временное значение — адрес i
+
+[.fragment]
+(2): копируется значение — адрес _из_ p
+
+[.fragment]
+(3): копируется значение — адрес, указывающий на кучу
+
+ifdef::backend-revealjs[=== !]
+Как поменять указатель внутри функции?
+
+[source,cpp]
+----
+void foo(???) { /* меняет аргумент */ };
+
+int *p; // какой-то адрес
+int *old_p = p;
+
+foo(p);
+
+assert(p != old_p);
+----
+
+== Динамическая память
+
+* new/new[] и парный delete/delete[]
+* избегайте ошибок :)
+
+=== Нахождение проблем
+* санитайзер — крутой инструмент
+* в CI: сборка с `-fsanitize=address`
+* примеры классов ошибок: https://en.wikipedia.org/wiki/AddressSanitizer#Examples[wiki]
+* доклад, о внутренностях: https://cppconf-moscow.ru/en/2020/msk/talks/5z8dm9cpuxlqkqgrr18eyb/[AddressSanitizer anatomy]
+
+== Структуры
+Минимальный вариант — это композиция типов
+
+[source,cpp]
+----
+struct Simple { int b; };
+
+struct Foo {
+    int a;
+    char *c;
+    Simple s;
+};
+
+Foo f;
+
+f.a = 42;
+f.c = new char[3]{};
+f.s.b = 24;
+----
+
+=== указатели на cтруктуры
+[source,cpp]
+----
+struct Simple {
+    int b;
+};
+
+Simple *s;
+
+(*s).b = 42;
+s->b = 42;
+----
+
+
+== Задачи
+== #1 concat
+
+Напишите функцию `concat`, которая принимает
+два участка памяти и аллоцирует новый, содержащий
+в себе данные обоих участков
+
+ifdef::backend-revealjs[=== !]
+
+[source, cpp]
+----
+char const* concat(
+    char const a[],
+    size_t a_size,
+    char const b[],
+    size_t b_size,
+    size_t& concat_size
+);
+----
+
+Смотрите тесты для примеров поведения
+
+=== #2 int_vector
+
+Реализуйте простой вектор интов (на структурах) и вспомогательные методы
+
+[source,cpp]
+----
+struct IntVector {
+    int    *data = nullptr;
+    size_t size = 0;
+    size_t capacity_ = 0;
+};
+
+void pushBack(IntVector& v, int value);
+void popBack(IntVector& v);
+void deallocate(IntVector& v);
+----
+
+ifdef::backend-revealjs[=== !]
+
+* `data_` — динамический массив из `capacity_` элементов
+* Есть доступ к элементам `v.data[i]` при `i < v.size`
+
+ifdef::backend-revealjs[=== !]
+
+* pushBack — добавляет элемент в конец, выделяет новую память (*2, начинает с 1) при `size == capacity_`
+* popBack — удаляет последний элемент из массива
+* deallocate — очищает всю память data_, обнуляет размепы
+
+=== #3 singleton
+
+* `singleton.hpp`
+** Определение функции `int inc()`, инкрементирующей счетчик и возвращающий его значение (начиная с нуля)
+
+ifdef::backend-revealjs[=== !]
+* `first.cpp`
+** Определение функции `int inc_first()`, вызывающей `inc`
+* `second.cpp`
+** Определение функции `int inc_second()`, вызывающей `inc`
+
+ifdef::backend-revealjs[=== !]
+
+* Ожидание: `inc_first(), inc_second(), inc_first()` — вернут 0, 1, 2, ...
+
+
+=== #4 stack&heap growth [*]
+
+Покажите, что адреса стека убывают, а адреса кучи растут
+
+Выведите в консоль соответствующие пары адресов (через `\n`) в функциях printStackGrowth и printHeapGrowth
